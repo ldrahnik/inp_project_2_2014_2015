@@ -71,10 +71,11 @@ begin
    if (RESET='1') then
       pc_reg <= (others=>'0');
    elseif (CLK'event) and (CLK='1') then
-      if (pc_ld='1' then
-         pc_reg <= pc_mx;
-      elseif (pc_inc='1') then
-         pc_reg <= pc_reg + 1;
+      if (pc_dec = '1') and (pc_inc = '0') then
+         pc_reg <= pc_reg - 1;
+      end if;
+      if (pc_dec = '0') and (pc_inc = '1') then
+            pc_reg <= pc_reg + 1;
       end if;
    end if;
 end process
