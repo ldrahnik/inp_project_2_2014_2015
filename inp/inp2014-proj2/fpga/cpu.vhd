@@ -66,7 +66,7 @@ signal MX1 : boolean := false;
 signal MX2 : std_logic_vector(1 downto 0) := "00";
 
 -- Final state machine states
-type fsm_state is (s_00, s_0, s_1, s_2, s_3, s_dec_ptr, s_inc_ptr, s_inc_value, s_inc_value_2, s_dec_value, s_dec_value_2, s_while_start, s_while_end, s_print_value, s_print_value_2, s_read_value, s_nothing, s_skip);
+type fsm_state is (s_00, s_0, s_1, s_2, s_3, s_dec_ptr, s_inc_ptr, s_inc_value, s_inc_value_2, s_dec_value, s_dec_value_2, s_while_start, s_while_end, s_print_value, s_print_value_2, s_read_value, s_read_value_2, s_nothing, s_skip);
 signal present_state    : fsm_state;
 signal next_state    : fsm_state;
 
@@ -336,6 +336,43 @@ begin
             else
                next_state <= s_print_value_2;
             end if;
+
+         -- ","      -> IN_REQ <- 1
+         --          while(!IN_VLD) {}
+         --          ram[PTR] <- IN_DATA
+         --          PC <- PC + 1
+         when s_read_value =>
+            IN_REQ <= '1';
+            MX1 <= true;            -- set data
+            next_state <= s_read_value_2;
+
+         -- ","
+         when s_read_value_2 =>
+            if (IN_VLD = '1') then
+               MX1 <= true;            -- set data
+               IN_REQ <= '0';
+               DATA_EN <= '1';         -- data enable
+
+               DATA_RDWR <= '1';       -- write
+               DATA_WDATA <= IN_DATA;
+
+               pc_inc <= '1';
+               pc_dec <= '0';
+               next_state <= s_0;
+            else next_state <= s_read_value_2;
+            end if;
+
+
+
+
+
+
+
+
+
+
+
+
 
          -- others
          when others =>
