@@ -44,16 +44,16 @@ end cpu;
 architecture behavioral of cpu is
 
 -- Program counter PC signals
-signal pc_reg        : std_logic_vector(15 downto 0);
+signal pc_reg        : std_logic_vector(12 downto 0);
 signal pc_ld         : std_logic;                 -- signal, ktery v '1' rika, ze to chci ulozit
 signal pc_inc        : std_logic;
 
 -- Instruction register IREG
-signal ireg_reg      : std_logic_vector(15 downto 0);
-signal ireg_ld       : std_logic;              -- signal, ktery v '1' rika, ze to chci ulozit
+signal ireg_reg      : std_logic_vector(7 downto 0);
+signal ireg_ld       : std_logic;                 -- signal, ktery v '1' rika, ze to chci ulozit
 
 -- Data pointer
-signal data_reg      : std_logic_vector(9 downto 0);
+signal data_reg      : std_logic_vector(12 downto 0);
 signal data_inc      : std_logic;
 signal data_dec      : std_logic;
 signal data_ld       : std_logic;
@@ -79,10 +79,6 @@ begin
    end if;
 end process
 
--- Program counter buffer
-DATA_ADDR <= pc_reg when (pc_abus ='1')
-                    else (others => 'Z');
-
 -- Instruction register IREG
 ireg: process (RESET, CLK)
 begin
@@ -90,7 +86,7 @@ begin
       ireg_reg <= (others=>'0');
    elseif (CLK'event) and (CLK='1') then
       if (ireg_ld='1') then
-         ireg_reg <= DBUS;
+         ireg_reg <= DATA_RDATA;
       end if;
    end if;
 end process
@@ -99,7 +95,7 @@ end process
 data_ptr: process(CLK, RESET)
    begin
       if (RESET='1') then
-         PTR_register <= (others=>'0');
+         PTR_register <= "1000000000000"
       elsif (RESET = '0') and (CLK'event) and (CLK = '1') then
       if (PTR_decrement = '1') and (PTR_increment = '0') then           -- decrement
          PTR_register <= PTR_register - 1;
@@ -110,10 +106,6 @@ data_ptr: process(CLK, RESET)
       end if;
    end if;
 end process;
-
---RAM
-DATA_ADDR <= PTR_register when data_ld='1' else
-   (others => 'Z');
 
 
 -- Instruction decoder -> decode ASCII value to instruction
