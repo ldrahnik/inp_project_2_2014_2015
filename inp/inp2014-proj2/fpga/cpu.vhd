@@ -17,19 +17,19 @@ entity cpu is
    CLK   : in std_logic;  -- hodinovy signal
    RESET : in std_logic;  -- asynchronni reset procesoru
    EN    : in std_logic;  -- povoleni cinnosti procesoru
- 
+
    -- synchronni pamet RAM
    DATA_ADDR  : out std_logic_vector(12 downto 0); -- adresa do pameti
    DATA_WDATA : out std_logic_vector(7 downto 0); -- mem[DATA_ADDR] <- DATA_WDATA pokud DATA_EN='1'
    DATA_RDATA : in std_logic_vector(7 downto 0);  -- DATA_RDATA <- ram[DATA_ADDR] pokud DATA_EN='1'
    DATA_RDWR  : out std_logic;                    -- cteni (0) / zapis (1)
    DATA_EN    : out std_logic;                    -- povoleni cinnosti
-   
+
    -- vstupni port
    IN_DATA   : in std_logic_vector(7 downto 0);   -- IN_DATA <- stav klavesnice pokud IN_VLD='1' a IN_REQ='1'
    IN_VLD    : in std_logic;                      -- data platna
    IN_REQ    : out std_logic;                     -- pozadavek na vstup data
-   
+
    -- vystupni port
    OUT_DATA : out  std_logic_vector(7 downto 0);  -- zapisovana data
    OUT_BUSY : in std_logic;                       -- LCD je zaneprazdnen (1), nelze zapisovat
@@ -43,11 +43,254 @@ end cpu;
 -- ----------------------------------------------------------------------------
 architecture behavioral of cpu is
 
- -- zde dopiste potrebne deklarace signalu
+-- Program counter PC signals
+signal pc_reg        : std_logic_vector(15 downto 0);
+signal pc_ld         : std_logic;                 -- signal, ktery v '1' rika, ze to chci ulozit
+signal pc_inc        : std_logic;
+
+-- Instruction register IREG
+signal ireg_reg      : std_logic_vector(15 downto 0);
+signal ireg_ld       : std_logic;              -- signal, ktery v '1' rika, ze to chci ulozit
+
+-- Data pointer
+signal data_reg      : std_logic_vector(9 downto 0);
+signal data_inc      : std_logic;
+signal data_dec      : std_logic;
+signal data_ld       : std_logic;
+
+-- Instruction decoder
+type inst_type is (dec_ptr, inc_ptr, inc_value, dev_value, while_start, while_end, print_value, read_value, halt);
+signal ireg_dec      : inst_type;
+
 
 begin
 
- -- zde dopiste vlastni VHDL kod
+-- Program counter PC
+pc_cntr: process (RESET, CLK)
+begin
+   if (RESET='1') then
+      pc_reg <= (others=>'0');
+   elseif (CLK'event) and (CLK='1') then
+      if (pc_ld='1' then
+         pc_reg <= pc_mx;
+      elseif (pc_inc='1') then
+         pc_reg <= pc_reg + 1;
+      end if;
+   end if;
+end process
+
+-- Program counter buffer
+DATA_ADDR <= pc_reg when (pc_abus ='1')
+                    else (others => 'Z');
+
+-- Instruction register IREG
+ireg: process (RESET, CLK)
+begin
+   if (RESET='1') then
+      ireg_reg <= (others=>'0');
+   elseif (CLK'event) and (CLK='1') then
+      if (ireg_ld='1') then
+         ireg_reg <= DBUS;
+      end if;
+   end if;
+end process
+
+-- Data pointer
+data_ptr: process(CLK, RESET)
+   begin
+      if (RESET='1') then
+         PTR_register <= (others=>'0');
+      elsif (RESET = '0') and (CLK'event) and (CLK = '1') then
+      if (PTR_decrement = '1') and (PTR_increment = '0') then           -- decrement
+         PTR_register <= PTR_register - 1;
+      end if;
+
+      if (PTR_decrement = '0') and (PTR_increment = '1') then           -- increment
+         PTR_register <= PTR_register + 1;
+      end if;
+   end if;
+end process;
+
+--RAM
+DATA_ADDR <= PTR_register when data_ld='1' else
+   (others => 'Z');
+
+
+-- Instruction decoder -> decode ASCII value to instruction
+process (ireg)
+begin
+   case (ireg(15 downto 14)) is
+      when X"3C" => ireg_dec <= dec_ptr;              --    "<"
+      when X"3E" => ireg_dec <= inc_ptr;              --    ">"
+      when X"2B" => ireg_dec <= inc_value;            --    "+"
+      when X"2D" => ireg_dec <= dec_value;            --    "-"
+      when X"5B" => ireg_dec <= while_start;          --    "["
+      when X"5D" => ireg_dec <= while_end;            --    "]"
+      when X"2E" => ireg_dec <= print_value;          --    "."
+      when X"2C" => ireg_dec <= read_value;           --    ","
+      when X"00" => ireg_dec <= null;                 --    "null"
+      when others => ireg_dec <= skip;                --    skip others
+   end case;
+end process;
+
+
+-- Final state machine
+fsm: process(present_state, ireg_dec, OUT_DATA)
+begin
+      next_state <= s00;
+
+      DATA_EN  <= '0';
+      dec_ptr  <= '0';
+      inc_ptr  <= '0';
+      ireg_ld  <= '0';
+      pc_reg   <= '0';
+      pc_ld    <= '0';
+      pc_inc   <= '0';
+      data_ld  <= '0';
+
+      case present_state is
+
+         when s_00 =>
+            next_state <= s_0;
+
+          -- Load instruction
+         when s_0 =>
+            next_state <= s_1;
+            pc_ld <= '1';
+            DATA_EN <= '1';
+
+         -- Load instruction to instruction register
+         when s_1 =>
+            next_state <= s_2;
+            ireg_ld <= '1';
+
+          -- Decode instruction
+         when s_2 =>
+            case ireg_dec is
+               when null =>
+                  next_state <= s_null;
+
+               when inc_ptr =>
+                  next_state <= s_inc_ptr;
+
+               when dec_ptr =>
+                  next_state <= s_dec_ptr;
+
+               when inc_val =>
+                  next_state <= s_inc_value;
+
+               when dec_val =>
+                  next_state <= s_dec_value;
+
+               when while_start =>
+                  next_state <= s_while_start;
+
+               when while_end =>
+                  next_state <= s_while_end;
+
+               when print_value =>
+                  next_state <= s_print_value;
+
+               when read_value =>
+                  next_state <= s_read_value;
+
+               when skip =>
+                  next_state <= s_skip;
+            end case;
+
+
+         -- null
+         when s_null =>
+            next_state <= s_null;
+
+         -- skip
+         when s_skip =>
+            pc_dec <= '0';
+            pc_inc <= '1';
+            next_state <= s_0;
+
+         -- ">"      ->  PTR <- PTR + 1
+         --          ->  PC  <- PC  + 1
+         when s_inc_ptr =>
+            data_dec <= '0';
+            data_inc <= '1';
+            pc_dec <= '0';
+            pc_inc <= '1';
+            next_state <= s_0;
+
+         -- "<"      ->  PTR <- PTR - 1
+         --          ->  PC  <- PC  + 1
+         when s_dec_ptr =>
+            data_dec <= '1';
+            data_inc <= '0';
+            pc_dec <= '0';
+            pc_inc <= '1';
+            next_state <= s_0;
+
+         -- "+"      ->  DATA_RDATA <- ram[PTR]
+         --          ->  ram[PTR] <- DATA_RDATA + 1
+         --          ->  PC <- PC + 1
+         when s_inc_value =>
+            DATA_EN <= '1';
+            data_ld <= '1';
+            DATA_RDWR <= '0';
+            next_state <= s_inc_value_2;
+
+         -- "+"
+         when s_inc_value_2 =>
+            data_ld <= '1';
+            DATA_EN <= '1';
+            DATA_RDWR <= '1';
+            DATA_WDATA <= DATA_RDATA + 1;
+
+            pc_inc <= '0';
+            pc_dec <= '1';
+            next_state <= s_0;
+
+         -- "-"      ->  DATA_RDATA <- ram[PTR]
+         --          ->  ram[PTR] <- DATA_RDATA - 1; PC <- PC + 1
+         when s_dec_val =>
+            DATA_EN <= '1';
+            data_ld <= '1';
+            DATA_RDWR <= '0';
+            next_state <= s_dec_value_2;
+
+         when s_dec_val_2 =>
+            data_ld <= '1';
+            DATA_EN <= '1';
+            DATA_RDWR <= '1';
+            DATA_WDATA <= DATA_RDATA - 1;
+
+            PC_decrement <= '0';
+            PC_increment <= '1';
+            next_state <= s_0;
+
+         -- "."      ->  OUT_DATA <- ram[PTR]
+         --          ->  PC       <- PC + 1
+         when s_print_value =>
+            DATA_EN     <= '1';
+            data_ld     <= '1';
+            DATA_RDWR   <= '0';
+            next_state <= s_print_value_2;
+
+         -- "."
+         when s_print_value_2 =>
+            if (OUT_BUSY = '0') then
+               OUT_WE <= '1';
+               OUT_DATA <= DATA_RDATA;
+               PC_decrement <= '0';
+               PC_increment <= '1';
+               next_state <= s_0;
+            else
+               next_state <= s_print_value_2;
+            end if;
+
+         -- others
+         when others =>
+            next_state <= s_0;
+
+      end case;
+   end process;
 
 end behavioral;
- 
+
