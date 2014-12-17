@@ -1,7 +1,7 @@
 -- cpu.vhd: Simple 8-bit CPU (BrainFuck interpreter)
 -- Copyright (C) 2014 Brno University of Technology,
 --                    Faculty of Information Technology
--- Author(s): DOPLNIT
+-- Author: Lukáš Drahník - xdrahn00
 --
 
 library ieee;
@@ -125,7 +125,6 @@ access: process()
    end if;
 end process;
 
-
 -- Instruction decoder -> decode ASCII value to instruction
 process (ireg)
 begin
@@ -241,20 +240,21 @@ begin
          --          ->  ram[PTR] <- DATA_RDATA + 1
          --          ->  PC <- PC + 1
          when s_inc_value =>
-            DATA_EN <= '1';
-            data_ld <= '1';
-            DATA_RDWR <= '0';
+            DATA_EN <= '1';         -- povolení činnosti
+            data_ld <= '1';         -- povolí sběrnici
+            DATA_RDWR <= '0';       -- ctení
+
             next_state <= s_inc_value_2;
 
          -- "+"
          when s_inc_value_2 =>
-            data_ld <= '1';
-            DATA_EN <= '1';
-            DATA_RDWR <= '1';
-            DATA_WDATA <= DATA_RDATA + 1;
+            --DATA_EN <= '1';       -- - || -
+            --data_ld <= '1';       -- - || -
+            --DATA_RDWR <= '1';     -- zápis
+            --DATA_WDATA <= DATA_RDATA + 1;
 
-            pc_inc <= '0';
-            pc_dec <= '1';
+            --pc_inc <= '1';
+            --pc_dec <= '0';
             next_state <= s_0;
 
          -- "-"      ->  DATA_RDATA <- ram[PTR]
