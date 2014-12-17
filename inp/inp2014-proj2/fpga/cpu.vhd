@@ -1,7 +1,7 @@
 -- cpu.vhd: Simple 8-bit CPU (BrainFuck interpreter)
 -- Copyright (C) 2014 Brno University of Technology,
 --                    Faculty of Information Technology
--- Author: Lukáš Drahník - xdrahn00
+-- Author: Lukas Drahnik - xdrahn00
 --
 
 library ieee;
