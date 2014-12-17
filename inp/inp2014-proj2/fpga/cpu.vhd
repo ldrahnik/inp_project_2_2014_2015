@@ -60,10 +60,13 @@ signal data_ld       : std_logic;
 
 -- Instruction decoder
 type inst_type is (dec_ptr, inc_ptr, inc_value, dev_value, while_start, while_end, print_value, read_value, halt);
-signal ireg_dec      : inst_type;
+signal ireg_decode   : inst_type;
 
+-- Data or Program
+signal acces_to_data : boolean := true;
 
 begin
+
 
 -- Program counter PC
 pc_cntr: process (RESET, CLK)
@@ -80,6 +83,7 @@ begin
    end if;
 end process
 
+
 -- Instruction register IREG
 ireg: process (RESET, CLK)
 begin
@@ -92,19 +96,32 @@ begin
    end if;
 end process
 
+
 -- Data pointer
 data_ptr: process(CLK, RESET)
    begin
       if (RESET='1') then
-         PTR_register <= "1000000000000"
+         data_reg <= "1000000000000";
       elsif (RESET = '0') and (CLK'event) and (CLK = '1') then
       if (PTR_decrement = '1') and (PTR_increment = '0') then           -- decrement
-         PTR_register <= PTR_register - 1;
+         data_reg <= data_reg - 1;
       end if;
 
       if (PTR_decrement = '0') and (PTR_increment = '1') then           -- increment
-         PTR_register <= PTR_register + 1;
+         data_reg <= data_reg + 1;
       end if;
+   end if;
+end process;
+
+
+
+-- Switch between two memories (Von Neumann)
+access: process()
+   begin
+   if (not(access_to_data)) then
+      DATA_ADDR <= pc_reg;
+   else
+      DATA_ADDR <= data_reg;
    end if;
 end process;
 
@@ -112,23 +129,23 @@ end process;
 -- Instruction decoder -> decode ASCII value to instruction
 process (ireg)
 begin
-   case (ireg(15 downto 14)) is
-      when X"3C" => ireg_dec <= dec_ptr;              --    "<"
-      when X"3E" => ireg_dec <= inc_ptr;              --    ">"
-      when X"2B" => ireg_dec <= inc_value;            --    "+"
-      when X"2D" => ireg_dec <= dec_value;            --    "-"
-      when X"5B" => ireg_dec <= while_start;          --    "["
-      when X"5D" => ireg_dec <= while_end;            --    "]"
-      when X"2E" => ireg_dec <= print_value;          --    "."
-      when X"2C" => ireg_dec <= read_value;           --    ","
-      when X"00" => ireg_dec <= null;                 --    "null"
-      when others => ireg_dec <= skip;                --    skip others
+   case ireg is
+      when X"3C" => ireg_decode <= dec_ptr;              --    "<"
+      when X"3E" => ireg_decode <= inc_ptr;              --    ">"
+      when X"2B" => ireg_decode <= inc_value;            --    "+"
+      when X"2D" => ireg_decode <= dec_value;            --    "-"
+      when X"5B" => ireg_decode <= while_start;          --    "["
+      when X"5D" => ireg_decode <= while_end;            --    "]"
+      when X"2E" => ireg_decode <= print_value;          --    "."
+      when X"2C" => ireg_decode <= read_value;           --    ","
+      when X"00" => ireg_decode <= null;                 --    "null"
+      when others => ireg_decode <= skip;                --    skip others
    end case;
 end process;
 
 
 -- Final state machine
-fsm: process(present_state, ireg_dec, OUT_DATA)
+fsm: process(present_state, ireg_decode, OUT_DATA)
 begin
       next_state <= s00;
 
@@ -159,7 +176,7 @@ begin
 
           -- Decode instruction
          when s_2 =>
-            case ireg_dec is
+            case ireg_decode is
                when null =>
                   next_state <= s_null;
 
