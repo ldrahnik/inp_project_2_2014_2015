@@ -9,7 +9,7 @@ use IEEE.std_logic_1164.ALL;
 use IEEE.std_logic_ARITH.ALL;
 use IEEE.std_logic_UNSIGNED.ALL;
 
-architecture main of tlv_bare_ifc is 
+architecture main of tlv_bare_ifc is
    -- displej
    signal lcd_data  : std_logic_vector(7 downto 0);
    signal lcd_we, lcd_busy    : std_logic;
@@ -34,25 +34,25 @@ architecture main of tlv_bare_ifc is
       RESET : in std_logic;
       CLK   : in std_logic;
       EN    : in std_logic;
-    
+
       -- RAM mem
       DATA_ADDR  : out std_logic_vector(12 downto 0);
       DATA_WDATA : out std_logic_vector(7 downto 0);
       DATA_RDATA : in std_logic_vector(7 downto 0);
       DATA_RDWR  : out std_logic;
       DATA_EN    : out std_logic;
-      
+
       -- INPUT
       IN_DATA   : in std_logic_vector(7 downto 0);
       IN_VLD    : in std_logic;
       IN_REQ    : out std_logic;
-      
+
       -- OUTPUT
       OUT_DATA : out  std_logic_vector(7 downto 0);
       OUT_BUSY : in std_logic;
       OUT_WE   : out std_logic
     );
-   end component;  
+   end component;
 
 begin
    -- ================================================
@@ -71,18 +71,18 @@ begin
 	   DATA_WDATA => ram_wdata,
 	   DATA_RDWR => ram_rdwr,
 	   DATA_EN   => ram_en,
-		
+
 		--INPUT
 	   IN_DATA   => in_data,
   	   IN_VLD    => in_vld,
 	   IN_REQ    => in_req,
-		
+
 		--OUTPUT
       OUT_DATA  => lcd_data,
       OUT_BUSY  => lcd_busy,
       OUT_WE    => lcd_we
    );
-		
+
 
    -- ================================================
    -- Pamet dat
@@ -99,16 +99,19 @@ begin
       --  [4] - overeni vstupu a vystupu, vlozene komentare
       --  [6], [7], [8] - overeni korektni funkce vnorenych smycek, vstupu a vystupu
 
-      -- [0] xdrahn 00
-      --INIT => "++++++++++++++++++++[>++++++>+++++>++<<<-]>.>.<------.>---.+++++++.++++++.>++++++++.." & nul 
+      -- [-1]
+      --INIT => "+++" & nul
 
-      -- [1] Vypis textu ABCDEFGHIJKL na displej 
+      -- [0] xdrahn 00
+      --INIT => "++++++++++++++++++++[>++++++>+++++>++<<<-]>.>.<------.>---.+++++++.++++++.>++++++++.." & nul
+
+      -- [1] Vypis textu ABCDEFGHIJKL na displej
       INIT => "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++.+.+.+.+.+.+.+.+.+.+.+." & nul
 
-      -- [2] Vypis textu na displej 
+      -- [2] Vypis textu na displej
       -- INIT => "++++++++++[>+++++++>+++>+++++<<<-]>+++.+++++.++.>>-----.+++++.--.+.+++.-------.<<++++++++++++++++++++++++++++++++.++.---.-----.>>+++++." & nul
 
-      -- [3] Vypis znaku stisknutych na klavesnici na displej (vypise se max. 10 znaku, pote se program ukonci) 
+      -- [3] Vypis znaku stisknutych na klavesnici na displej (vypise se max. 10 znaku, pote se program ukonci)
       -- INIT => "++++++++++[>,.<-] 10x opakovat nacteni znaku a zapis na display" & nul
 
       -- [4] Vypis znaku stisknutych na klavesnici na displej (vypisuje se dokud neni stisknuta klavesa * nebo # (tzn. konec radku))
@@ -149,17 +152,17 @@ begin
 
       -- Pro FITkit s dvouradkovym displejem nastavit na True, jinak False
       -- Pro ucely simulace je tato promenna ignorovana, nebot simulacni model je napsan pouze pro jednoradkovy displej
-      LCD2x16 => True 
+      LCD2x16 => True
    )
    port map(
       CLK         => CLK,
       RST         => cpu_rst,
-   
+
       -- user interface
       DATA_IN     => lcd_data,
       WRITE_EN    => lcd_we,
    	BUSY        => lcd_busy,
-   
+
       -- lcd interface
       DISPLAY_RS    => LRS,
       DISPLAY_RW    => LRW,
@@ -174,26 +177,26 @@ begin
    port map(
       CLK         => CLK,
       RST         => RESET,
-   
+
       -- user interface
       DATA        => in_data,
       DATA_VLD    => in_vld,
    	DATA_REQ    => in_req,
       REQ_ACK     => kb_ack,
-   
+
       -- lcd interface
       KB_IN    => KIN,
       KB_OUT    => KOUT
    );
 
    --pokud se ceka na stisk tlacitka, rozsvitit diodu D4
-   LEDF <= not kb_ack; 
+   LEDF <= not kb_ack;
 
 
    -- ================================================
    -- Osetreni nulovani a povoleni cinnosti
    -- ================================================
-   -- Protoze pamet nelze inicializovat na nuly, 
+   -- Protoze pamet nelze inicializovat na nuly,
    -- nesmime dovolit vicenasobny reset procesoru
 
    process (RESET, CLK)
@@ -209,7 +212,7 @@ begin
       end if;
    end process;
 
-   cpu_rst <= RESET when cpu_en = '0' else 
+   cpu_rst <= RESET when cpu_en = '0' else
               '0';
 
 end main;
