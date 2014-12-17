@@ -99,6 +99,9 @@ begin
       --  [4] - overeni vstupu a vystupu, vlozene komentare
       --  [6], [7], [8] - overeni korektni funkce vnorenych smycek, vstupu a vystupu
 
+      -- [0] xdrahn 00
+      --INIT => "++++++++++++++++++++[>++++++>+++++>++<<<-]>.>.<------.>---.+++++++.++++++.>++++++++.." & nul 
+
       -- [1] Vypis textu ABCDEFGHIJKL na displej 
       INIT => "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++.+.+.+.+.+.+.+.+.+.+.+." & nul
 
