@@ -178,7 +178,7 @@ end process;
 
 
 -- Final state machine
-process (present_state, ireg_decode, OUT_BUSY)
+process (present_state, ireg_decode, OUT_BUSY, DATA_RDATA)
 begin
 
       DATA_EN     <= '0';
@@ -343,24 +343,25 @@ begin
          --          PC <- PC + 1
          when s_read_value =>
             IN_REQ <= '1';
-            MX1 <= true;            -- set data
+            MX1 <= true;               -- set data
             next_state <= s_read_value_2;
 
          -- ","
-         when s_read_value_2 =>
-            if (IN_VLD = '1') then
-               MX1 <= true;            -- set data
-               IN_REQ <= '0';
-               DATA_EN <= '1';         -- data enable
+         --when s_read_value_2 =>
+         --  if (IN_VLD = '1') then
+         --      MX1 <= true;            -- set data
+         --      IN_REQ <= '0';
+         --      DATA_EN <= '1';         -- data enable
 
-               DATA_RDWR <= '1';       -- write
-               DATA_WDATA <= IN_DATA;
+         --      DATA_RDWR <= '1';       -- write
+         --      DATA_WDATA <= IN_DATA;
 
-               pc_inc <= '1';
-               pc_dec <= '0';
-               next_state <= s_0;
-            else next_state <= s_read_value_2;
-            end if;
+         --      pc_dec <= '0';
+         --      pc_inc <= '1';
+         --      next_state <= s_0;
+         --   else
+         --      next_state <= s_read_value_2;
+         --   end if;
 
 
 
