@@ -63,12 +63,22 @@ signal ireg_decode   : inst_type;
 
 -- Data or Program
 signal MX1 : boolean := false;
-signal MX2 : std_logic_vector(1 downto 0) := "00";
+signal MX2 : std_logic_vector(1 downto 0) := "11";
 
--- Final state machine states
-type fsm_state is (s_00, s_0, s_1, s_2, s_3, s_dec_ptr, s_inc_ptr, s_inc_value, s_inc_value_2, s_dec_value, s_dec_value_2, s_while_start, s_while_end, s_print_value, s_print_value_2, s_read_value, s_read_value_2, s_nothing, s_skip);
+-- Cnt register
+signal cnt_reg          : std_logic_vector(11 downto 0) := "000000000000";
+signal cnt_inc          : std_logic;
+signal cnt_dec          : std_logic;
+signal cnt_proc         : std_logic := '0';
+
+-- Fsm states definicion
+type fsm_state is (s_00, s_0, s_1, s_2, s_3, s_dec_ptr, s_inc_ptr, s_inc_value, s_inc_value_2, s_dec_value, s_dec_value_2, s_print_value, s_print_value_2, s_read_value, s_read_value_2, s_nothing, s_skip,
+s_while_start, s_while_start_2, s_while_start_3, s_while_start_4, s_while_start_5,
+s_while_end, s_while_end_2, s_while_end_3, s_while_end_4, s_while_end_5, s_while_end_6);
+
+-- Ffm states
 signal present_state    : fsm_state;
-signal next_state    : fsm_state;
+signal next_state       : fsm_state;
 
 begin
 
@@ -137,7 +147,7 @@ end process;
 process (CLK)
 begin
    if (MX2 = "00") then                       -- input
-      -- TODO
+      DATA_WDATA <= IN_DATA;
    elsif (MX2 = "01") then                    -- increment
       DATA_WDATA <= DATA_RDATA + 1;
    elsif (MX2 = "10") then                    -- decrement
@@ -176,19 +186,38 @@ fsm_pstate: process(EN, RESET, CLK)
    end if;
 end process;
 
+-- Cnt register
+process(CLK, RESET)
+   begin
+      if (RESET = '1')
+         cnt_reg <= (others => '0');
+      elsif (RESET = '0') and (CLK'event) and (CLK = '1') then
+         if (cnt_proc = '0') then
+            if (cnt_dec = '1') and (cnt_inc = '0') then        -- decrement
+               cnt_reg <= cnt_reg - 1;
+            end if;
+
+            if (cnt_dec = '0') and (cnt_inc = '1') then        -- increment
+               cnt_reg <= cnt_reg + 1;
+            end if;
+         else
+            cnt_reg <= "000000000001";
+         end if;
+   end if;
+end process;
 
 -- Final state machine
 process (present_state, ireg_decode, OUT_BUSY, DATA_RDATA)
 begin
 
-      DATA_EN     <= '0';
-      DATA_RDWR   <= '0';
-      ireg_ld     <= '0';
-      pc_inc      <= '0';
-      pc_dec      <= '0';
-      data_inc      <= '0';
-      data_dec      <= '0';
-      OUT_WE      <= '0';
+      DATA_EN        <= '0';
+      DATA_RDWR      <= '0';
+      ireg_ld        <= '0';
+      pc_inc         <= '0';
+      pc_dec         <= '0';
+      data_inc       <= '0';
+      data_dec       <= '0';
+      OUT_WE         <= '0';
       MX1 <= false;
       MX2 <= "11";
 
@@ -342,30 +371,147 @@ begin
          --          ram[PTR] <- IN_DATA
          --          PC <- PC + 1
          when s_read_value =>
+            DATA_EN <= '1';            -- data enable
             IN_REQ <= '1';
             MX1 <= true;               -- set data
             next_state <= s_read_value_2;
 
          -- ","
          --when s_read_value_2 =>
-         --  if (IN_VLD = '1') then
-         --      MX1 <= true;            -- set data
-         --      IN_REQ <= '0';
-         --      DATA_EN <= '1';         -- data enable
+           if (IN_VLD = '1') then
+               DATA_EN <= '1';         -- data enable
+               MX1 <= true;            -- set data
+               IN_REQ <= '0';
 
-         --      DATA_RDWR <= '1';       -- write
-         --      DATA_WDATA <= IN_DATA;
+               DATA_RDWR <= '1';       -- write
+               MX2 <= "00";
 
-         --      pc_dec <= '0';
-         --      pc_inc <= '1';
-         --      next_state <= s_0;
-         --   else
-         --      next_state <= s_read_value_2;
-         --   end if;
-
-
+               pc_dec <= '0';
+               pc_inc <= '1';
+               next_state <= s_0;
+            else
+               next_state <= s_read_value_2;
+            end if;
 
 
+         -- "["           -> PC <- PC + 1
+         --               -> if (ram[PTR] == 0)
+         --               ->    cnt <- 1
+         --               ->    while (cnt != 0)
+         --               ->        c <- rom[PC]
+         --               ->        if (c == '[') cnt <- + 1
+         --               ->        elsif (c == ']') cnt <- cnt -1
+         --               ->        PC <- PC + 1
+         when s_while_start =>
+            pc_inc <= '0';
+            pc_dec <= '1';
+
+            DATA_EN <= '1';         -- data enable
+            DATA_RDWR <= '0';       -- read
+
+            next_state <= s_while_start_2;
+
+         when s_while_start_2 =>
+            if (DATA_RDATA = "00000000") then
+               cnt_proc <= '1';
+               next_state <= s_while_start_3;
+            else
+               next_state <= s_00;
+            end if;
+
+         when s_while_start_3 =>
+
+            next_state <= s_while_start_4;
+            MX1 := false;
+
+         when s_while_start_4 =>                                  -- TODO: remove s_while_start_4 nebo se na nej nekde odkazuje?
+            next_state <= s_while_start_3;
+
+         when s_while_start_5 =>
+            if (cnt_reg /= "000000000000") then
+               if (ireg_reg = "000001011011") then -- [
+                  cnt_inc <= '1';
+                  cnt_dec <= '0';
+               elsif (ireg_reg = "000001011101") then -- ]
+                  cnt_inc <= '0';
+                  cnt_dec <= '1';
+               end if;
+
+               next_state <= s_while_start_3;
+            else
+               next_state <= s_00;
+            end if;
+
+            pc_inc <= '0';
+            PC_dec <= '1';
+
+
+
+         -- "]"           -> if (ram[PTR] == 0)
+         --               ->     PC <- PC + 1
+         --               -> else
+         --               ->     cnt <- 1
+         --               ->     PC <- PC - 1
+         --               ->     while (cnt != 0)
+         --               ->        c <- rom[PC]
+         --               ->        if (c == ']') cnt <- cnt + 1
+         --               ->        elsif (c == '[') cnt <- cnt - 1
+         --               ->        if (cnt == 0) PC <- PC + 1
+         --               ->        else PC <- PC - 1
+         when s_while_end =>
+            DATA_EN <= '1';            -- data enable
+            MX1 := false;              -- data
+            DATA_RDWR <= '0';          -- read
+
+            next_state <= s_while_end_2;
+
+         when s_while_end_2 =>
+            if (DATA_RDATA = "00000000") then
+               pc_dec <= '0';
+               pc_inc <= '1';
+
+               next_state <= s_0
+            else
+               cnt_proc <= '1';
+               pc_dec <= '1';
+               pc_inc <= '0';
+
+               next_state <= s_while_end_3;
+            end if;
+
+         when s_while_end_3 =>
+            DATA_EN <= '1';            -- data enable
+            next_state <= s_while_end_4;
+            MX1 := true;              -- program
+
+         when s_while_end_4 =>
+            next_state <= s_while_end_5;
+
+         when s_while_end_5 =>
+            if (cnt_reg /= "000000000000") then --pokud zbyvaji nejake zavorky
+               if (ireg_reg = "000001011011") then -- [
+                  cnt_inc <= '0';
+                  cnt_dec <= '1';
+               elsif (ireg_reg = "000001011101") then -- ]
+                  cnt_inc <= '1';
+                  cnt_dec <= '0';
+               end if;
+
+               next_state <= s_while_end_6;
+            else
+               next_state <= s_0; --vyskoc z ignorovani while
+            end if;
+
+         when s_while_end_6 =>
+            if (cnt_reg = "000000000000") then
+               pc_dec <= '0';
+               pc_inc <= '1';
+            else
+               pc_dec <= '1';
+               pc_inc <= '0';
+            end if;
+
+            next_state <= s_while_end_3;
 
 
 
