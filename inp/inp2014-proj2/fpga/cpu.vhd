@@ -50,7 +50,7 @@ signal pc_dec        : std_logic;
 
 -- Instruction register IREG
 signal ireg_reg      : std_logic_vector(7 downto 0);
-signal ireg_ld       : std_logic;                 -- signal, ktery v '1' rika, ze to chci ulozit
+signal ireg_ld       : std_logic;                 -- load instruction
 
 -- Data pointer
 signal data_reg      : std_logic_vector(12 downto 0);
@@ -73,8 +73,8 @@ signal cnt_proc         : std_logic := '0';
 
 -- Fsm states definicion
 type fsm_state is (s_00, s_0, s_1, s_2, s_3, s_dec_ptr, s_inc_ptr, s_inc_value, s_inc_value_2, s_dec_value, s_dec_value_2, s_print_value, s_print_value_2, s_read_value, s_read_value_2, s_nothing, s_skip,
-s_while_start, s_while_start_2, s_while_start_3, s_while_start_4, s_while_start_5,
-s_while_end, s_while_end_2, s_while_end_3, s_while_end_4, s_while_end_5, s_while_end_6);
+s_while_start, s_while_start_2, s_while_start_3, s_while_start_4,
+s_while_end, s_while_end_2, s_while_end_3, s_while_end_4, s_while_end_5);
 
 -- Ffm states
 signal present_state    : fsm_state;
@@ -189,15 +189,13 @@ end process;
 -- Cnt register
 process(CLK, RESET)
    begin
-      if (RESET = '1')
+      if (RESET = '1') then
          cnt_reg <= (others => '0');
       elsif (RESET = '0') and (CLK'event) and (CLK = '1') then
          if (cnt_proc = '0') then
-            if (cnt_dec = '1') and (cnt_inc = '0') then        -- decrement
+            if (cnt_dec = '1') and (cnt_inc = '0') then           -- decrement
                cnt_reg <= cnt_reg - 1;
-            end if;
-
-            if (cnt_dec = '0') and (cnt_inc = '1') then        -- increment
+            elsif (cnt_dec = '0') and (cnt_inc = '1') then        -- increment
                cnt_reg <= cnt_reg + 1;
             end if;
          else
@@ -207,17 +205,19 @@ process(CLK, RESET)
 end process;
 
 -- Final state machine
-process (present_state, ireg_decode, OUT_BUSY, DATA_RDATA)
+process (present_state, ireg_decode, OUT_BUSY, DATA_RDATA, CLK, RESET, EN, IN_DATA, IN_VLD, OUT_BUSY)
 begin
-
+      IN_REQ         <= '0';
+      OUT_WE         <= '0';
       DATA_EN        <= '0';
       DATA_RDWR      <= '0';
       ireg_ld        <= '0';
       pc_inc         <= '0';
       pc_dec         <= '0';
+      cnt_dec        <= '0';
+      cnt_inc        <= '0';
       data_inc       <= '0';
       data_dec       <= '0';
-      OUT_WE         <= '0';
       MX1 <= false;
       MX2 <= "11";
 
@@ -278,16 +278,13 @@ begin
 
          -- skip
          when s_skip =>
-            pc_dec <= '0';
             pc_inc <= '1';
             next_state <= s_0;
 
          -- ">"      ->  PTR <- PTR + 1
          --          ->  PC  <- PC  + 1
          when s_inc_ptr =>
-            data_dec <= '0';
             data_inc <= '1';
-            pc_dec <= '0';
             pc_inc <= '1';
             next_state <= s_0;
 
@@ -295,8 +292,6 @@ begin
          --          ->  PC  <- PC  + 1
          when s_dec_ptr =>
             data_dec <= '1';
-            data_inc <= '0';
-            pc_dec <= '0';
             pc_inc <= '1';
             next_state <= s_0;
 
@@ -317,7 +312,6 @@ begin
             MX2 <= "01";            -- increment
 
             pc_inc <= '1';
-            pc_dec <= '0';
             next_state <= s_0;
 
          -- "-"      ->  DATA_RDATA <- ram[PTR]
@@ -329,7 +323,6 @@ begin
             MX1 <= true;            -- set data
 
             pc_inc <= '1';
-            pc_dec <= '0';
             next_state <= s_dec_value_2;
 
          -- "-"
@@ -340,7 +333,6 @@ begin
             MX2 <= "10";            -- decrement
 
             pc_inc <= '1';
-            pc_dec <= '0';
             next_state <= s_0;
 
          -- "."      ->  OUT_DATA <- ram[PTR]
@@ -359,7 +351,6 @@ begin
                OUT_WE <= '1';
                OUT_DATA <= DATA_RDATA;
 
-               pc_dec <= '0';
                pc_inc <= '1';
                next_state <= s_0;
             else
@@ -386,7 +377,6 @@ begin
                DATA_RDWR <= '1';       -- write
                MX2 <= "00";
 
-               pc_dec <= '0';
                pc_inc <= '1';
                next_state <= s_0;
             else
@@ -403,47 +393,58 @@ begin
          --               ->        elsif (c == ']') cnt <- cnt -1
          --               ->        PC <- PC + 1
          when s_while_start =>
-            pc_inc <= '0';
             pc_dec <= '1';
 
             DATA_EN <= '1';         -- data enable
             DATA_RDWR <= '0';       -- read
+            MX1 <= true;            -- set data
 
             next_state <= s_while_start_2;
 
          when s_while_start_2 =>
+            DATA_EN <= '1';         -- data enable          -- these three row are only for testing
+            DATA_RDWR <= '0';       -- read
+            MX1 <= true;            -- set data
+
             if (DATA_RDATA = "00000000") then
                cnt_proc <= '1';
-               next_state <= s_while_start_3;
+
+               DATA_EN <= '1';         -- data enable       -- these three row are only for testing
+               DATA_RDWR <= '0';       -- read
+               MX1 <= false;            -- set program
+
+
+               next_state <= s_while_start_4;
             else
                next_state <= s_00;
             end if;
 
-         when s_while_start_3 =>
+         --when s_while_start_3 =>
 
-            next_state <= s_while_start_4;
-            MX1 := false;
+         --   next_state <= s_while_start_4;
+         --   MX1 <= false;
 
-         when s_while_start_4 =>                                  -- TODO: remove s_while_start_4 nebo se na nej nekde odkazuje?
-            next_state <= s_while_start_3;
+         when s_while_start_4 =>
+            DATA_EN <= '1';            -- data enable          -- these three row are only for testing
+            DATA_RDWR <= '0';          -- read
+            MX1 <= false;              -- set program
 
-         when s_while_start_5 =>
+
             if (cnt_reg /= "000000000000") then
-               if (ireg_reg = "000001011011") then -- [
+
+               if (DATA_RDATA = "01011011") then             -- [     so increment
+                  cnt_proc <= '0';                             -- nejde dekrementovat bez tohodle
                   cnt_inc <= '1';
-                  cnt_dec <= '0';
-               elsif (ireg_reg = "000001011101") then -- ]
-                  cnt_inc <= '0';
+               elsif (DATA_RDATA = "1011101") then          -- ]     do decrement
+                  cnt_proc <= '0';                             -- nejde dekrementovat bez tohodle
                   cnt_dec <= '1';
                end if;
 
-               next_state <= s_while_start_3;
+               next_state <= s_while_start_4;
             else
-               next_state <= s_00;
+               next_state <= s_0;
             end if;
-
-            pc_inc <= '0';
-            PC_dec <= '1';
+            pc_inc <= '1';
 
 
 
@@ -460,21 +461,18 @@ begin
          --               ->        else PC <- PC - 1
          when s_while_end =>
             DATA_EN <= '1';            -- data enable
-            MX1 := false;              -- data
+            MX1 <= false;              -- set to data
             DATA_RDWR <= '0';          -- read
 
             next_state <= s_while_end_2;
 
          when s_while_end_2 =>
             if (DATA_RDATA = "00000000") then
-               pc_dec <= '0';
                pc_inc <= '1';
-
-               next_state <= s_0
+               next_state <= s_0;
             else
                cnt_proc <= '1';
                pc_dec <= '1';
-               pc_inc <= '0';
 
                next_state <= s_while_end_3;
             end if;
@@ -482,33 +480,26 @@ begin
          when s_while_end_3 =>
             DATA_EN <= '1';            -- data enable
             next_state <= s_while_end_4;
-            MX1 := true;              -- program
+            MX1 <= true;              -- program
 
          when s_while_end_4 =>
-            next_state <= s_while_end_5;
-
-         when s_while_end_5 =>
             if (cnt_reg /= "000000000000") then --pokud zbyvaji nejake zavorky
                if (ireg_reg = "000001011011") then -- [
-                  cnt_inc <= '0';
                   cnt_dec <= '1';
                elsif (ireg_reg = "000001011101") then -- ]
                   cnt_inc <= '1';
-                  cnt_dec <= '0';
                end if;
 
-               next_state <= s_while_end_6;
+               next_state <= s_while_end_5;
             else
                next_state <= s_0; --vyskoc z ignorovani while
             end if;
 
-         when s_while_end_6 =>
+         when s_while_end_5 =>
             if (cnt_reg = "000000000000") then
-               pc_dec <= '0';
                pc_inc <= '1';
             else
                pc_dec <= '1';
-               pc_inc <= '0';
             end if;
 
             next_state <= s_while_end_3;
