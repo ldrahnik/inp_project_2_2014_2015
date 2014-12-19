@@ -137,9 +137,9 @@ end process;
 process (CLK)
 begin
    if (not(MX1)) then
-      DATA_ADDR <= pc_reg;                    -- program
+      DATA_ADDR <= pc_reg;                    -- program    - false
    else
-      DATA_ADDR <= data_reg;                  -- data
+      DATA_ADDR <= data_reg;                  -- data       - true
    end if;
 end process;
 
@@ -205,7 +205,7 @@ process(CLK, RESET)
 end process;
 
 -- Final state machine
-process (present_state, ireg_decode, OUT_BUSY, DATA_RDATA, CLK, RESET, EN, IN_DATA, IN_VLD, OUT_BUSY)
+process (present_state, ireg_decode, ireg_reg, OUT_BUSY, DATA_RDATA, CLK, RESET, EN, IN_DATA, IN_VLD, OUT_BUSY)
 begin
       IN_REQ         <= '0';
       OUT_WE         <= '0';
@@ -216,10 +216,20 @@ begin
       pc_dec         <= '0';
       cnt_dec        <= '0';
       cnt_inc        <= '0';
+      cnt_proc       <= '0';
       data_inc       <= '0';
       data_dec       <= '0';
       MX1 <= false;
       MX2 <= "11";
+
+
+
+
+
+
+
+
+
 
       case present_state is
          when s_00 =>
@@ -272,11 +282,11 @@ begin
             end case;
 
 
-         -- nothing
+         -- do nothing
          when s_nothing =>
             next_state <= s_nothing;
 
-         -- skip
+         -- skip (comments)
          when s_skip =>
             pc_inc <= '1';
             next_state <= s_0;
@@ -378,6 +388,11 @@ begin
                MX2 <= "00";
 
                pc_inc <= '1';
+
+               DATA_EN <= '1';         -- data enable          -- TEST 3 ROWS
+               DATA_RDWR <= '1';       -- write
+               MX1 <= true;            -- set data
+
                next_state <= s_0;
             else
                next_state <= s_read_value_2;
@@ -393,8 +408,7 @@ begin
          --               ->        elsif (c == ']') cnt <- cnt -1
          --               ->        PC <- PC + 1
          when s_while_start =>
-            pc_dec <= '1';
-
+            pc_inc <= '1';
             DATA_EN <= '1';         -- data enable
             DATA_RDWR <= '0';       -- read
             MX1 <= true;            -- set data
@@ -402,48 +416,35 @@ begin
             next_state <= s_while_start_2;
 
          when s_while_start_2 =>
-            DATA_EN <= '1';         -- data enable          -- these three row are only for testing
-            DATA_RDWR <= '0';       -- read
-            MX1 <= true;            -- set data
-
             if (DATA_RDATA = "00000000") then
                cnt_proc <= '1';
-
-               DATA_EN <= '1';         -- data enable       -- these three row are only for testing
-               DATA_RDWR <= '0';       -- read
-               MX1 <= false;            -- set program
-
-
-               next_state <= s_while_start_4;
+               next_state <= s_while_start_3;
             else
                next_state <= s_00;
             end if;
 
-         --when s_while_start_3 =>
+         when s_while_start_3 =>
 
-         --   next_state <= s_while_start_4;
-         --   MX1 <= false;
-
-         when s_while_start_4 =>
-            DATA_EN <= '1';            -- data enable          -- these three row are only for testing
+            DATA_EN <= '1';            -- data enable
             DATA_RDWR <= '0';          -- read
             MX1 <= false;              -- set program
 
+            --ireg_ld <= '1';
+            next_state <= s_while_start_4;
+
+         when s_while_start_4 =>
 
             if (cnt_reg /= "000000000000") then
-
                if (DATA_RDATA = "01011011") then             -- [     so increment
-                  cnt_proc <= '0';                             -- nejde dekrementovat bez tohodle
                   cnt_inc <= '1';
-               elsif (DATA_RDATA = "1011101") then          -- ]     do decrement
-                  cnt_proc <= '0';                             -- nejde dekrementovat bez tohodle
+               elsif (DATA_RDATA = "01011101") then          -- ]     do decrement
                   cnt_dec <= '1';
                end if;
-
                next_state <= s_while_start_4;
             else
                next_state <= s_0;
             end if;
+
             pc_inc <= '1';
 
 
@@ -460,10 +461,9 @@ begin
          --               ->        if (cnt == 0) PC <- PC + 1
          --               ->        else PC <- PC - 1
          when s_while_end =>
-            DATA_EN <= '1';            -- data enable
-            MX1 <= false;              -- set to data
-            DATA_RDWR <= '0';          -- read
-
+            DATA_EN <= '1';         -- data enable
+            DATA_RDWR <= '0';       -- read
+            MX1 <= true;            -- set data
             next_state <= s_while_end_2;
 
          when s_while_end_2 =>
@@ -473,26 +473,28 @@ begin
             else
                cnt_proc <= '1';
                pc_dec <= '1';
-
                next_state <= s_while_end_3;
             end if;
 
          when s_while_end_3 =>
             DATA_EN <= '1';            -- data enable
+            DATA_RDWR <= '0';          -- read
+            MX1 <= false;              -- program
+
+            --ireg_ld <= '1';
             next_state <= s_while_end_4;
-            MX1 <= true;              -- program
 
          when s_while_end_4 =>
-            if (cnt_reg /= "000000000000") then --pokud zbyvaji nejake zavorky
-               if (ireg_reg = "000001011011") then -- [
+            if (cnt_reg /= "000000000000") then               -- some ] left to empty
+               if (DATA_RDATA = "01011011") then              -- [     so decrement
                   cnt_dec <= '1';
-               elsif (ireg_reg = "000001011101") then -- ]
+               elsif (DATA_RDATA = "01011101") then           -- ]     do increment
                   cnt_inc <= '1';
                end if;
 
                next_state <= s_while_end_5;
             else
-               next_state <= s_0; --vyskoc z ignorovani while
+               next_state <= s_0;
             end if;
 
          when s_while_end_5 =>
@@ -505,15 +507,9 @@ begin
             next_state <= s_while_end_3;
 
 
-
-
-
-
-
-
-
          -- others
          when others =>
+            pc_inc <= '1';          -- ma byt??
             next_state <= s_0;
 
       end case;
