@@ -315,8 +315,8 @@ begin
          -- "+"
          when s_inc_value_2 =>
             DATA_EN <= '1';         -- data enable
-            DATA_RDWR <= '0';       -- read
-            --MX1 <= true;            -- set data
+            DATA_RDWR <= '1';       -- write
+            MX1 <= true;            -- set data
             MX2 <= "01";            -- increment
 
             pc_inc <= '1';
@@ -334,8 +334,8 @@ begin
          -- "-"
          when s_dec_value_2 =>
             DATA_EN <= '1';         -- data enable
-            DATA_RDWR <= '0';       -- write
-            --MX1 <= true;            -- set data
+            DATA_RDWR <= '1';       -- write
+            MX1 <= true;            -- set data
             MX2 <= "10";            -- decrement
 
             pc_inc <= '1';
