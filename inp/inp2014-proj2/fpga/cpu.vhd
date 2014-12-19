@@ -357,7 +357,7 @@ begin
             else
                DATA_EN     <= '1';     -- data enable
                DATA_RDWR   <= '0';     -- read
-               MX1 <= true;            --set data
+               MX1 <= true;            -- set data
                OUT_WE <= '1';
                OUT_DATA <= DATA_RDATA;
 
@@ -471,7 +471,6 @@ begin
             DATA_RDWR <= '0';          -- read
             MX1 <= false;              -- program
 
-            --ireg_ld <= '1';
             next_state <= s_while_end_4;
 
          when s_while_end_4 =>
