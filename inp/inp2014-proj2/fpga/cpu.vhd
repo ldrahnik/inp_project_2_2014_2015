@@ -69,7 +69,6 @@ signal MX2 : std_logic_vector(1 downto 0) := "11";
 signal cnt_reg          : std_logic_vector(11 downto 0) := "000000000000";
 signal cnt_inc          : std_logic;
 signal cnt_dec          : std_logic;
-signal cnt_proc         : std_logic := '0';
 
 -- Fsm states definicion
 type fsm_state is (s_00, s_0, s_1, s_2, s_3, s_dec_ptr, s_inc_ptr,
@@ -197,14 +196,10 @@ process(CLK, RESET)
       if (RESET = '1') then
          cnt_reg <= (others => '0');
       elsif (RESET = '0') and (CLK'event) and (CLK = '1') then
-         if (cnt_proc = '0') then
-            if (cnt_dec = '1') and (cnt_inc = '0') then           -- decrement
-               cnt_reg <= cnt_reg - 1;
-            elsif (cnt_dec = '0') and (cnt_inc = '1') then        -- increment
-               cnt_reg <= cnt_reg + 1;
-            end if;
-         else
-            cnt_reg <= "000000000001";
+         if (cnt_dec = '1') and (cnt_inc = '0') then           -- decrement
+            cnt_reg <= cnt_reg - 1;
+         elsif (cnt_dec = '0') and (cnt_inc = '1') then        -- increment
+            cnt_reg <= cnt_reg + 1;
          end if;
    end if;
 end process;
@@ -221,7 +216,6 @@ begin
       pc_dec         <= '0';
       cnt_dec        <= '0';
       cnt_inc        <= '0';
-      cnt_proc       <= '0';
       data_inc       <= '0';
       data_dec       <= '0';
       MX1 <= false;
@@ -353,7 +347,7 @@ begin
          -- "."
          when s_print_value_2 =>
             if (OUT_BUSY = '1') then
-               next_state <= s_print_value_2;
+               next_state <= s_print_value;
             else
                DATA_EN     <= '1';     -- data enable
                DATA_RDWR   <= '0';     -- read
@@ -407,7 +401,7 @@ begin
             DATA_EN <= '1';                     -- data enable
             DATA_RDWR <= '0';                   -- read
             if (DATA_RDATA = "00000000") then
-               cnt_proc <= '1';
+               cnt_inc <= '1';
                next_state <= s_while_start_3;
             else
                next_state <= s_00;
@@ -464,7 +458,7 @@ begin
                pc_inc <= '1';
                next_state <= s_0;
             else
-               cnt_proc <= '1';
+               cnt_inc <= '1';
                pc_dec <= '1';
                next_state <= s_while_end_3;
             end if;
@@ -504,7 +498,7 @@ begin
 
          -- others
          when others =>
-            pc_inc <= '1';          -- ma byt??
+            pc_inc <= '1';
             next_state <= s_0;
 
       end case;
