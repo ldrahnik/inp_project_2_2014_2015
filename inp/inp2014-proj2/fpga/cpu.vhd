@@ -72,7 +72,12 @@ signal cnt_dec          : std_logic;
 signal cnt_proc         : std_logic := '0';
 
 -- Fsm states definicion
-type fsm_state is (s_00, s_0, s_1, s_2, s_3, s_dec_ptr, s_inc_ptr, s_inc_value, s_inc_value_2, s_dec_value, s_dec_value_2, s_print_value, s_print_value_2, s_read_value, s_read_value_2, s_nothing, s_skip,
+type fsm_state is (s_00, s_0, s_1, s_2, s_3, s_dec_ptr, s_inc_ptr,
+s_inc_value, s_inc_value_2,
+s_dec_value, s_dec_value_2, s_print_value, s_print_value_2,
+s_read_value, s_read_value_2, s_read_value_3,
+s_nothing,
+s_skip,
 s_while_start, s_while_start_2, s_while_start_3, s_while_start_4,
 s_while_end, s_while_end_2, s_while_end_3, s_while_end_4, s_while_end_5);
 
@@ -324,8 +329,6 @@ begin
             DATA_EN <= '1';         -- data enable
             DATA_RDWR <= '0';       -- read
             MX1 <= true;            -- set data
-
-            pc_inc <= '1';
             next_state <= s_dec_value_2;
 
          -- "-"
@@ -367,31 +370,21 @@ begin
          --          ram[PTR] <- IN_DATA
          --          PC <- PC + 1
          when s_read_value =>
-            DATA_EN <= '1';            -- data enable
             IN_REQ <= '1';
-            MX1 <= true;               -- set data
-            next_state <= s_read_value_2;
-
-         -- ","
-         --when s_read_value_2 =>
-           if (IN_VLD = '1') then
-               DATA_EN <= '1';         -- data enable
-               MX1 <= true;            -- set data
-               IN_REQ <= '0';
-
-               DATA_RDWR <= '1';       -- write
-               MX2 <= "00";
-
-               pc_inc <= '1';
-
-               DATA_EN <= '1';         -- data enable          -- TEST 3 ROWS
-               DATA_RDWR <= '1';       -- write
-               MX1 <= true;            -- set data
-
-               next_state <= s_0;
+            if (IN_VLD = '0') then
+               next_state <= s_read_value;
             else
                next_state <= s_read_value_2;
             end if;
+
+         when s_read_value_2 =>
+            DATA_EN <= '1';            -- data enable
+            MX1 <= true;               -- set data
+            DATA_RDWR   <= '1';        -- write
+            MX2 <= "00";
+
+            pc_inc <= '1';
+            next_state <= s_0;
 
 
          -- "["           -> PC <- PC + 1
@@ -411,6 +404,8 @@ begin
             next_state <= s_while_start_2;
 
          when s_while_start_2 =>
+            DATA_EN <= '1';                     -- data enable
+            DATA_RDWR <= '0';                   -- read
             if (DATA_RDATA = "00000000") then
                cnt_proc <= '1';
                next_state <= s_while_start_3;
@@ -419,15 +414,15 @@ begin
             end if;
 
          when s_while_start_3 =>
-
             DATA_EN <= '1';            -- data enable
             DATA_RDWR <= '0';          -- read
             MX1 <= false;              -- set program
 
-            --ireg_ld <= '1';
             next_state <= s_while_start_4;
 
          when s_while_start_4 =>
+            DATA_EN <= '1';                     -- data enable
+            DATA_RDWR <= '0';                   -- read
 
             if (cnt_reg /= "000000000000") then
                if (DATA_RDATA = "01011011") then             -- [     so increment
