@@ -139,7 +139,7 @@ end process;
 
 
 -- MX1
-process (CLK)
+process (MX1, data_reg, pc_reg)
 begin
    if (not(MX1)) then
       DATA_ADDR <= pc_reg;                    -- program    - false
@@ -149,7 +149,7 @@ begin
 end process;
 
 -- MX2
-process (CLK)
+process (MX2, DATA_RDATA, IN_DATA)
 begin
    if (MX2 = "00") then                       -- input
       DATA_WDATA <= IN_DATA;
@@ -315,8 +315,8 @@ begin
          -- "+"
          when s_inc_value_2 =>
             DATA_EN <= '1';         -- data enable
-            DATA_RDWR <= '1';       -- write
-            MX1 <= true;            -- set data
+            DATA_RDWR <= '0';       -- read
+            --MX1 <= true;            -- set data
             MX2 <= "01";            -- increment
 
             pc_inc <= '1';
@@ -334,8 +334,8 @@ begin
          -- "-"
          when s_dec_value_2 =>
             DATA_EN <= '1';         -- data enable
-            DATA_RDWR <= '1';       -- write
-            MX1 <= true;            -- set data
+            DATA_RDWR <= '0';       -- write
+            --MX1 <= true;            -- set data
             MX2 <= "10";            -- decrement
 
             pc_inc <= '1';
