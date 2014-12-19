@@ -74,7 +74,7 @@ signal cnt_dec          : std_logic;
 type fsm_state is (s_00, s_0, s_1, s_2, s_3, s_dec_ptr, s_inc_ptr,
 s_inc_value, s_inc_value_2,
 s_dec_value, s_dec_value_2, s_print_value, s_print_value_2,
-s_read_value, s_read_value_2, s_read_value_3,
+s_read_value, s_read_value_2,
 s_nothing,
 s_skip,
 s_while_start, s_while_start_2, s_while_start_3, s_while_start_4,
@@ -89,11 +89,11 @@ begin
 
 
 -- Program counter PC
-pc_cntr: process (RESET, CLK)
+pc_cntr: process (RESET, CLK, EN)
 begin
    if (RESET = '1') then
       pc_reg <= (others => '0');
-   elsif (CLK'event) and (CLK = '1') then
+   elsif (CLK'event) and (CLK = '1') and EN = '1' then
       if (pc_dec = '1') and (pc_inc = '0') then
          pc_reg <= pc_reg - 1;
       end if;
@@ -106,11 +106,11 @@ end process;
 
 
 -- Instruction register IREG
-ireg: process (RESET, CLK)
+ireg: process (RESET, CLK, EN)
 begin
    if (RESET = '1') then
       ireg_reg <= (others => '0');
-   elsif (CLK'event) and (CLK = '1') then
+   elsif (CLK'event) and (CLK = '1') and EN = '1' then
       if (ireg_ld = '1') then
          ireg_reg <= DATA_RDATA;
       end if;
@@ -124,7 +124,7 @@ data_ptr: process(CLK, RESET)
    begin
       if (RESET = '1') then
          data_reg <= "1000000000000";
-      elsif (RESET = '0') and (CLK'event) and (CLK = '1') then
+      elsif (RESET = '0') and (CLK'event) and (CLK = '1') and EN = '1' then
       if (data_dec = '1') and (data_inc = '0') then           -- decrement
          data_reg <= data_reg - 1;
       end if;
@@ -346,12 +346,13 @@ begin
 
          -- "."
          when s_print_value_2 =>
+            DATA_EN     <= '1';     -- data enable
+            DATA_RDWR   <= '0';     -- read
+            MX1 <= true;            -- set data
+
             if (OUT_BUSY = '1') then
-               next_state <= s_print_value;
+               next_state <= s_print_value_2;
             else
-               DATA_EN     <= '1';     -- data enable
-               DATA_RDWR   <= '0';     -- read
-               MX1 <= true;            -- set data
                OUT_WE <= '1';
                OUT_DATA <= DATA_RDATA;
 
