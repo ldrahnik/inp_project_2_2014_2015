@@ -61,7 +61,7 @@ signal data_dec      : std_logic;
 type inst_type is (dec_ptr, inc_ptr, inc_value, dec_value, while_start, while_end, print_value, read_value, nothing, skip);
 signal ireg_decode   : inst_type;
 
--- Data or Program
+-- Data or Program or Input
 signal MX1 : boolean := false;
 signal MX2 : std_logic_vector(1 downto 0) := "11";
 
@@ -221,14 +221,7 @@ begin
       data_dec       <= '0';
       MX1 <= false;
       MX2 <= "11";
-
-
-
-
-
-
-
-
+      --next_state <= s_00;              --TEST add  nulování
 
 
       case present_state is
@@ -239,7 +232,7 @@ begin
          when s_0 =>
             next_state <= s_1;
             DATA_EN <= '1';
-            DATA_RDWR <= '0';
+            DATA_RDWR <= '0';          -- read
             MX1 <= false;
 
          -- Load instruction to instruction register
@@ -356,15 +349,17 @@ begin
 
          -- "."
          when s_print_value_2 =>
-            if (OUT_BUSY = '0') then
-               MX1 <= true;            -- set data
+            if (OUT_BUSY = '1') then
+               next_state <= s_print_value_2;
+            else
+               DATA_EN     <= '1';     -- data enable
+               DATA_RDWR   <= '0';     -- read
+               MX1 <= true;            --set data
                OUT_WE <= '1';
                OUT_DATA <= DATA_RDATA;
 
                pc_inc <= '1';
                next_state <= s_0;
-            else
-               next_state <= s_print_value_2;
             end if;
 
          -- ","      -> IN_REQ <- 1
@@ -440,7 +435,7 @@ begin
                elsif (DATA_RDATA = "01011101") then          -- ]     do decrement
                   cnt_dec <= '1';
                end if;
-               next_state <= s_while_start_4;
+               next_state <= s_while_start_3;
             else
                next_state <= s_0;
             end if;
