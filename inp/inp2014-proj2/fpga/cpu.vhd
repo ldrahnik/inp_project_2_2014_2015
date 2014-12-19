@@ -457,6 +457,9 @@ begin
             next_state <= s_while_end_2;
 
          when s_while_end_2 =>
+            DATA_EN <= '1';         -- data enable
+            DATA_RDWR <= '0';       -- read
+
             if (DATA_RDATA = "00000000") then
                pc_inc <= '1';
                next_state <= s_0;
@@ -474,6 +477,9 @@ begin
             next_state <= s_while_end_4;
 
          when s_while_end_4 =>
+            DATA_EN <= '1';         -- data enable
+            DATA_RDWR <= '0';       -- read
+
             if (cnt_reg /= "000000000000") then               -- some ] left to empty
                if (DATA_RDATA = "01011011") then              -- [     so decrement
                   cnt_dec <= '1';
